@@ -17,18 +17,21 @@ jobs:
       - name: Setup Compiler
         run: |
           git clone --depth=1 https://github.com/kdrag0n/proton-clang.git clang-llvm
+          rm -f clang-llvm/bin/as clang-llvm/bin/ld
 
       - name: Clone Xiaomi Lancelot Q Kernel Source
         run: |
           git clone --depth=1 https://github.com/android-kernels/xiaomi-lancelot-q-oss.git kernel_source
           cd kernel_source
           git clone https://android.googlesource.com/platform/system/libufdt scripts/ufdt/libufdt
+          sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l || true
+          sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.lex.c_shipped || true
 
       - name: Configure and Build Modules
         run: |
           export PATH="$(pwd)/clang-llvm/bin:${PATH}"
           cd kernel_source
-          make O=out ARCH=arm64 lancelot_defconfig
+          make O=out ARCH=arm64 HOSTCFLAGS="-fcommon" lancelot_defconfig
           scripts/config --file out/.config \
             -d CONFIG_CC_STACKPROTECTOR_STRONG \
             -e CONFIG_CC_STACKPROTECTOR_NONE \
@@ -49,7 +52,7 @@ jobs:
             -m CONFIG_MT76_USB \
             -e CONFIG_CFG80211 \
             -e CONFIG_CFG80211_WEXT
-          make O=out ARCH=arm64 olddefconfig
+          make O=out ARCH=arm64 HOSTCFLAGS="-fcommon" olddefconfig
           make -j$(nproc --all) O=out \
             ARCH=arm64 \
             CC=clang \
@@ -59,6 +62,7 @@ jobs:
             AR=llvm-ar \
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
+            HOSTCFLAGS="-fcommon" \
             modules 2>&1 | tee ../build.log
 
       - name: Collect Modules
