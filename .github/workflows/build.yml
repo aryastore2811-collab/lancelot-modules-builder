@@ -1,0 +1,86 @@
+name: Build Lancelot WiFi Modules
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi zip python2 python3
+
+      - name: Setup Compiler
+        run: |
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git clang-llvm
+
+      - name: Clone Xiaomi Lancelot Q Kernel Source
+        run: |
+          git clone --depth=1 https://github.com/android-kernels/xiaomi-lancelot-q-oss.git kernel_source
+
+      - name: Configure and Build Modules
+        run: |
+          export PATH="$(pwd)/clang-llvm/bin:${PATH}"
+          cd kernel_source
+          make O=out ARCH=arm64 lancelot_defconfig
+          scripts/config --file out/.config \
+            -e CONFIG_MODULES \
+            -e CONFIG_MODVERSIONS \
+            -m CONFIG_MAC80211 \
+            -e CONFIG_MAC80211_RC_MINSTREL \
+            -e CONFIG_MAC80211_RC_MINSTREL_HT \
+            -e CONFIG_MAC80211_LEDS \
+            -m CONFIG_RT2X00 \
+            -m CONFIG_RT2X00_LIB \
+            -m CONFIG_RT2X00_LIB_USB \
+            -m CONFIG_RT2800USB \
+            -e CONFIG_RT2800USB_RT53XX \
+            -m CONFIG_MT76x2U \
+            -m CONFIG_MT76x2_COMMON \
+            -m CONFIG_MT76_CORE \
+            -m CONFIG_MT76_USB \
+            -e CONFIG_CFG80211 \
+            -e CONFIG_CFG80211_WEXT
+          make -j$(nproc --all) O=out \
+            ARCH=arm64 \
+            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            AR=llvm-ar \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            modules_prepare
+          make -j$(nproc --all) O=out \
+            ARCH=arm64 \
+            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            AR=llvm-ar \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            modules 2>&1 | tee ../build.log
+
+      - name: Collect Modules
+        run: |
+          mkdir -p modules
+          find kernel_source/out/ -name "*.ko" -exec cp {} modules/ \;
+          cd modules
+          ls -la
+          zip -r ../lancelot_wifi_modules.zip ./*
+
+      - name: Upload Modules Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lancelot-wifi-modules
+          path: lancelot_wifi_modules.zip
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
