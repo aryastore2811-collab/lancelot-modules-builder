@@ -21,6 +21,8 @@ jobs:
       - name: Clone Xiaomi Lancelot Q Kernel Source
         run: |
           git clone --depth=1 https://github.com/android-kernels/xiaomi-lancelot-q-oss.git kernel_source
+          cd kernel_source
+          git clone https://android.googlesource.com/platform/system/libufdt scripts/ufdt/libufdt
 
       - name: Configure and Build Modules
         run: |
@@ -28,6 +30,8 @@ jobs:
           cd kernel_source
           make O=out ARCH=arm64 lancelot_defconfig
           scripts/config --file out/.config \
+            -d CONFIG_CC_STACKPROTECTOR_STRONG \
+            -e CONFIG_CC_STACKPROTECTOR_NONE \
             -e CONFIG_MODULES \
             -e CONFIG_MODVERSIONS \
             -m CONFIG_MAC80211 \
@@ -49,6 +53,7 @@ jobs:
           make -j$(nproc --all) O=out \
             ARCH=arm64 \
             CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             AR=llvm-ar \
