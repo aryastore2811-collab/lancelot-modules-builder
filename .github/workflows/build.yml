@@ -45,15 +45,7 @@ jobs:
             -m CONFIG_MT76_USB \
             -e CONFIG_CFG80211 \
             -e CONFIG_CFG80211_WEXT
-          make -j$(nproc --all) O=out \
-            ARCH=arm64 \
-            CC=clang \
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            AR=llvm-ar \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip \
-            modules_prepare
+          make O=out ARCH=arm64 olddefconfig
           make -j$(nproc --all) O=out \
             ARCH=arm64 \
             CC=clang \
