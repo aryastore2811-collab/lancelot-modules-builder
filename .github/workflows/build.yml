@@ -34,8 +34,10 @@ jobs:
         run: |
           mkdir -p kernel_source/drivers/net/wireless/mediatek/mt76
           unzip -o mt76_src.zip -d kernel_source/drivers/net/wireless/mediatek/mt76
+          find kernel_source -exec touch {} +
           echo 'obj-y += mt76/' >> kernel_source/drivers/net/wireless/mediatek/Makefile
           echo 'source "drivers/net/wireless/mediatek/mt76/Kconfig"' >> kernel_source/drivers/net/wireless/mediatek/Kconfig
+
 
       - name: Configure and Build Kernel Modules
         run: |
