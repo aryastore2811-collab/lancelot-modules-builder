@@ -50,7 +50,9 @@ jobs:
             -m CONFIG_ATH9K_HW \
             -m CONFIG_ATH9K_COMMON \
             -m CONFIG_ATH9K_HTC \
-            -e CONFIG_ATH9K_HTC_DEBUGFS \
+            -d CONFIG_ATH9K_COMMON_SPECTRAL \
+            -d CONFIG_ATH9K_DEBUGFS \
+            -d CONFIG_ATH9K_HTC_DEBUGFS \
             -m CONFIG_MT7601U \
             -e CONFIG_STAGING \
             -m CONFIG_R8188EU \
@@ -79,12 +81,15 @@ jobs:
           cd rtl8812au
           sed -i 's/CONFIG_PLATFORM_I386_PC = y/CONFIG_PLATFORM_I386_PC = n/' Makefile
           sed -i 's/CONFIG_PLATFORM_ARM64_RPI = n/CONFIG_PLATFORM_ARM64_RPI = y/' Makefile
+          sed -i '/stringop-overread/d' Makefile
+          sed -i 's/-Werror//g' Makefile
           make -j$(nproc --all) \
             KSRC="$(pwd)/../kernel_source/out" \
             ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
+            USER_EXTRA_CFLAGS="-Wno-unknown-warning-option -Wno-error" \
             modules 2>&1 | tee ../build_rtl8812au.log || true
 
       - name: Collect Modules and Firmwares
