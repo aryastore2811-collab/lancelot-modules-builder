@@ -34,10 +34,9 @@ jobs:
         run: |
           mkdir -p kernel_source/drivers/net/wireless/mediatek/mt76
           unzip -o mt76_src.zip -d kernel_source/drivers/net/wireless/mediatek/mt76
-          find kernel_source -exec touch {} +
           echo 'obj-y += mt76/' >> kernel_source/drivers/net/wireless/mediatek/Makefile
           echo 'source "drivers/net/wireless/mediatek/mt76/Kconfig"' >> kernel_source/drivers/net/wireless/mediatek/Kconfig
-
+          find kernel_source -exec touch {} +
 
       - name: Configure and Build Kernel Modules
         run: |
@@ -65,6 +64,7 @@ jobs:
             -d CONFIG_ATH9K_COMMON_SPECTRAL \
             -d CONFIG_ATH9K_DEBUGFS \
             -d CONFIG_ATH9K_HTC_DEBUGFS \
+            -e CONFIG_WLAN_VENDOR_MEDIATEK \
             -m CONFIG_MT7601U \
             -m CONFIG_MT76_CORE \
             -m CONFIG_MT76_USB \
@@ -78,6 +78,7 @@ jobs:
             -e CONFIG_CFG80211 \
             -e CONFIG_CFG80211_WEXT
           make O=out ARCH=arm64 HOSTCFLAGS="-fcommon" olddefconfig
+          grep -i "MT76" out/.config || true
           make -j$(nproc --all) O=out \
             ARCH=arm64 \
             CC=clang \
