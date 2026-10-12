@@ -12,7 +12,7 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi zip python2 python3
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi zip python2 python3 curl
 
       - name: Setup Compiler
         run: |
@@ -27,7 +27,7 @@ jobs:
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l || true
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.lex.c_shipped || true
 
-      - name: Configure and Build Modules
+      - name: Configure and Build Kernel Modules
         run: |
           export PATH="$(pwd)/clang-llvm/bin:${PATH}"
           cd kernel_source
@@ -46,10 +46,17 @@ jobs:
             -m CONFIG_RT2X00_LIB_USB \
             -m CONFIG_RT2800USB \
             -e CONFIG_RT2800USB_RT53XX \
-            -m CONFIG_MT76x2U \
-            -m CONFIG_MT76x2_COMMON \
-            -m CONFIG_MT76_CORE \
-            -m CONFIG_MT76_USB \
+            -m CONFIG_ATH_COMMON \
+            -m CONFIG_ATH9K_HW \
+            -m CONFIG_ATH9K_COMMON \
+            -m CONFIG_ATH9K_HTC \
+            -e CONFIG_ATH9K_HTC_DEBUGFS \
+            -m CONFIG_MT7601U \
+            -e CONFIG_STAGING \
+            -m CONFIG_R8188EU \
+            -e CONFIG_88EU_AP_MODE \
+            -m CONFIG_RTL8XXXU \
+            -e CONFIG_RTL8XXXU_UNTESTED \
             -e CONFIG_CFG80211 \
             -e CONFIG_CFG80211_WEXT
           make O=out ARCH=arm64 HOSTCFLAGS="-fcommon" olddefconfig
@@ -65,12 +72,38 @@ jobs:
             HOSTCFLAGS="-fcommon" \
             modules 2>&1 | tee ../build.log
 
-      - name: Collect Modules
+      - name: Build Realtek RTL8812AU (AC1200 5GHz)
+        run: |
+          export PATH="$(pwd)/clang-llvm/bin:${PATH}"
+          git clone --depth=1 https://github.com/aircrack-ng/rtl8812au.git rtl8812au
+          cd rtl8812au
+          sed -i 's/CONFIG_PLATFORM_I386_PC = y/CONFIG_PLATFORM_I386_PC = n/' Makefile
+          sed -i 's/CONFIG_PLATFORM_ARM64_RPI = n/CONFIG_PLATFORM_ARM64_RPI = y/' Makefile
+          make -j$(nproc --all) \
+            KSRC="$(pwd)/../kernel_source/out" \
+            ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            modules 2>&1 | tee ../build_rtl8812au.log || true
+
+      - name: Collect Modules and Firmwares
         run: |
           mkdir -p modules
+          mkdir -p modules/firmware
           find kernel_source/out/ -name "*.ko" -exec cp {} modules/ \;
+          find rtl8812au/ -name "*.ko" -exec cp {} modules/ \; || true
+          
+          # Download common firmwares
+          curl -sL https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/ath9k_htc/htc_9271-1.4.0.fw -o modules/firmware/htc_9271.fw || true
+          curl -sL https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/ath9k_htc/htc_7010-1.4.0.fw -o modules/firmware/htc_7010.fw || true
+          curl -sL https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/mt7601u.bin -o modules/firmware/mt7601u.bin || true
+          curl -sL https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8188eufw.bin -o modules/firmware/rtl8188eufw.bin || true
+          curl -sL https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rt2870.bin -o modules/firmware/rt2870.bin || true
+
           cd modules
           ls -la
+          ls -la firmware/
           zip -r ../lancelot_wifi_modules.zip ./*
 
       - name: Upload Modules Artifact
