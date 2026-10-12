@@ -27,6 +27,17 @@ jobs:
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l || true
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.lex.c_shipped || true
 
+      - name: Add MT76 / MT7612U Source from Linux 4.19 LTS
+        run: |
+          git clone --depth=1 --filter=blob:none --sparse https://github.com/gregkh/linux.git -b linux-4.19.y linux-419-tree
+          cd linux-419-tree
+          git sparse-checkout set drivers/net/wireless/mediatek/mt76
+          cp -r drivers/net/wireless/mediatek/mt76 ../kernel_source/drivers/net/wireless/mediatek/
+          cd ../kernel_source
+          sed -i 's|-I\$(src)|-I\$(src) -I\$(srctree)/\$(src)|g' drivers/net/wireless/mediatek/mt76/Makefile
+          echo 'obj-y += mt76/' >> drivers/net/wireless/mediatek/Makefile
+          echo 'source "drivers/net/wireless/mediatek/mt76/Kconfig"' >> drivers/net/wireless/mediatek/Kconfig
+
       - name: Configure and Build Kernel Modules
         run: |
           export PATH="$(pwd)/clang-llvm/bin:${PATH}"
@@ -54,6 +65,10 @@ jobs:
             -d CONFIG_ATH9K_DEBUGFS \
             -d CONFIG_ATH9K_HTC_DEBUGFS \
             -m CONFIG_MT7601U \
+            -m CONFIG_MT76_CORE \
+            -m CONFIG_MT76_USB \
+            -m CONFIG_MT76x2_COMMON \
+            -m CONFIG_MT76x2U \
             -e CONFIG_STAGING \
             -m CONFIG_R8188EU \
             -e CONFIG_88EU_AP_MODE \
@@ -105,6 +120,8 @@ jobs:
           curl -sL https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/mt7601u.bin -o modules/firmware/mt7601u.bin || true
           curl -sL https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8188eufw.bin -o modules/firmware/rtl8188eufw.bin || true
           curl -sL https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rt2870.bin -o modules/firmware/rt2870.bin || true
+          curl -sL https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/mediatek/mt7662u.bin -o modules/firmware/mt7662u.bin || true
+          curl -sL https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/mediatek/mt7662u_rom_patch.bin -o modules/firmware/mt7662u_rom_patch.bin || true
 
           cd modules
           ls -la
