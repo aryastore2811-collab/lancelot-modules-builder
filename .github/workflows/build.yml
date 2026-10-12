@@ -34,8 +34,34 @@ jobs:
         run: |
           mkdir -p kernel_source/drivers/net/wireless/mediatek/mt76
           unzip -o mt76_src.zip -d kernel_source/drivers/net/wireless/mediatek/mt76
-          echo 'obj-y += mt76/' >> kernel_source/drivers/net/wireless/mediatek/Makefile
-          echo 'source "drivers/net/wireless/mediatek/mt76/Kconfig"' >> kernel_source/drivers/net/wireless/mediatek/Kconfig
+          
+          # Fix Makefile to always compile mt76 drivers as modules when mediatek wireless is built
+          cat << 'EOF' > kernel_source/drivers/net/wireless/mediatek/mt76/Makefile
+obj-m += mt76.o
+obj-m += mt76-usb.o
+obj-m += mt76x2-common.o
+obj-m += mt76x2u.o
+
+mt76-y := \
+	mmio.o util.o trace.o dma.o mac80211.o debugfs.o eeprom.o tx.o agg-rx.o
+
+mt76-usb-y := usb.o usb_trace.o usb_mcu.o
+
+CFLAGS_trace.o := -I$(src) -I$(srctree)/$(src)
+CFLAGS_usb_trace.o := -I$(src) -I$(srctree)/$(src)
+
+mt76x2-common-y := \
+	mt76x2_eeprom.o mt76x2_tx_common.o mt76x2_mac_common.o \
+	mt76x2_init_common.o mt76x2_common.o mt76x2_phy_common.o \
+	mt76x2_debugfs.o
+
+mt76x2u-y := \
+	mt76x2_usb.o mt76x2u_init.o mt76x2u_main.o mt76x2u_mac.o \
+	mt76x2u_mcu.o mt76x2u_phy.o mt76x2u_core.o
+
+CFLAGS_mt76x2_trace.o := -I$(src) -I$(srctree)/$(src)
+EOF
+          echo 'obj-$(CONFIG_MT7601U) += mt76/' >> kernel_source/drivers/net/wireless/mediatek/Makefile
           find kernel_source -exec touch {} +
 
       - name: Configure and Build Kernel Modules
@@ -66,10 +92,6 @@ jobs:
             -d CONFIG_ATH9K_HTC_DEBUGFS \
             -e CONFIG_WLAN_VENDOR_MEDIATEK \
             -m CONFIG_MT7601U \
-            -m CONFIG_MT76_CORE \
-            -m CONFIG_MT76_USB \
-            -m CONFIG_MT76x2_COMMON \
-            -m CONFIG_MT76x2U \
             -e CONFIG_STAGING \
             -m CONFIG_R8188EU \
             -e CONFIG_88EU_AP_MODE \
@@ -78,7 +100,6 @@ jobs:
             -e CONFIG_CFG80211 \
             -e CONFIG_CFG80211_WEXT
           make O=out ARCH=arm64 HOSTCFLAGS="-fcommon" olddefconfig
-          grep -i "MT76" out/.config || true
           make -j$(nproc --all) O=out \
             ARCH=arm64 \
             CC=clang \
