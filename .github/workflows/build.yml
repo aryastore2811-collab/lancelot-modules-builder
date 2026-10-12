@@ -9,6 +9,9 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
@@ -27,16 +30,12 @@ jobs:
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.l || true
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/' scripts/dtc/dtc-lexer.lex.c_shipped || true
 
-      - name: Add MT76 / MT7612U Source from Linux 4.19 LTS
+      - name: Extract MT76 / MT7612U Source
         run: |
-          git clone --depth=1 --filter=blob:none --sparse https://github.com/gregkh/linux.git -b linux-4.19.y linux-419-tree
-          cd linux-419-tree
-          git sparse-checkout set drivers/net/wireless/mediatek/mt76
-          cp -r drivers/net/wireless/mediatek/mt76 ../kernel_source/drivers/net/wireless/mediatek/
-          cd ../kernel_source
-          sed -i 's|-I\$(src)|-I\$(src) -I\$(srctree)/\$(src)|g' drivers/net/wireless/mediatek/mt76/Makefile
-          echo 'obj-y += mt76/' >> drivers/net/wireless/mediatek/Makefile
-          echo 'source "drivers/net/wireless/mediatek/mt76/Kconfig"' >> drivers/net/wireless/mediatek/Kconfig
+          mkdir -p kernel_source/drivers/net/wireless/mediatek/mt76
+          unzip -o mt76_src.zip -d kernel_source/drivers/net/wireless/mediatek/mt76
+          echo 'obj-y += mt76/' >> kernel_source/drivers/net/wireless/mediatek/Makefile
+          echo 'source "drivers/net/wireless/mediatek/mt76/Kconfig"' >> kernel_source/drivers/net/wireless/mediatek/Kconfig
 
       - name: Configure and Build Kernel Modules
         run: |
